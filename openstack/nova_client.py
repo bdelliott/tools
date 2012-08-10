@@ -73,9 +73,7 @@ class NovaClient(object):
         headers = self._headers()
 
         r = requests.get(url, headers=headers)
-        assert r.status_code == 200
-        d = json.loads(r.text)
-        return d
+        return r
 
     def post(self, path, d):
 
