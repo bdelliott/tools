@@ -75,13 +75,16 @@ class NovaClient(object):
         r = requests.get(url, headers=headers)
         return r
 
-    def post(self, path, d):
+    def post(self, path, d, encode_json=True):
 
         url = self.nova_url + path
-        print url
+        #print url
         body = None
         if d:
-            body = json.dumps(d)
+            if encode_json:
+                body = json.dumps(d)
+            else:
+                body = d
 
         headers = self._headers()
         r = requests.post(url, data=body, headers = headers)

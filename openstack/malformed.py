@@ -2,6 +2,8 @@ import json
 import sys
 import time
 
+from prettytable import PrettyTable
+
 import nova_client
 
 
@@ -24,12 +26,12 @@ def malformed_create(client, d, msg):
     r = client.post("/servers", d)
     end = time.time()
 
-    print "  %d" % r.status_code
-    if r.status_code == 500:
-        sys.exit(1)
-
     secs = end - start
-    print "  %0.2f" % secs
+
+    if r.status_code != 400:
+        print "Bad code:  %d" % r.status_code
+        print "  %0.2f" % secs
+
     return secs
     
 def malformed_creates(client):
@@ -40,8 +42,11 @@ def malformed_creates(client):
     d = {"%2e%2e%5c%2fetc%2fpasswd": []}
     malformed_create(client, d, "No server key")
 
+    malformed_create(client, 1234, "Integer for body")
+    malformed_create(client, "foobar", "String for body")
 
-def wrong_method():
+
+def wrong_method(client):
     # send with wrong HTTP method:
     path = "/servers?image=b142bd0c-d66d-4b6e-913b-2f7541f21eff"
     r = client.post(path, None)
@@ -50,10 +55,33 @@ def wrong_method():
     # again with a body:
     d = {"foo": "bar"}
     body = json.dumps(d)
-    r = client.post(path, None)
+    r = client.post(path, body)
     print r.status_code
 
- 
+
+def wrong_method_timed_newlines(client, num):
+    """Time to check claim that lots of newlines somehow creates
+    nonlinear API response times.
+    """
+    path = "/servers"
+
+    d = {"servers": [] }
+    body = json.dumps(d)
+    #print body
+
+    # shave closing '}' and insert the newlines
+    body = body[:-1]
+    body = body + "\n"*num
+    body = body + "}"
+    #print body
+    start = time.time()
+    r = client.post(path, d)
+    end = time.time()
+
+    secs = end - start
+    return secs
+
+
 if __name__=='__main__':
     #client = nova_client.NovaClient("preprod")
 
@@ -61,5 +89,17 @@ if __name__=='__main__':
 
     client = nova_client.NovaClient(host="sq", username="bde", tenant="openstack")
 
-    malformed_creates(client)
-    #wrong_method()
+    #malformed_creates(client)
+    #wrong_method(client)
+
+    #d = {"%2e%2e%5c%2fetc%2fpasswd": []}
+    #malformed_create(client, d, "No server key")
+
+    x = PrettyTable(["Num", "Secs"])        
+
+    for num in range(0, 10000, 100):
+        secs = 1000 * wrong_method_timed_newlines(client, num)
+        secs = "%0.2f" % secs
+        x.add_row((num, secs))    
+
+    print x
